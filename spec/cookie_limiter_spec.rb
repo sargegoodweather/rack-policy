@@ -9,7 +9,7 @@ describe Rack::Policy::CookieLimiter do
     last_response.body.should == 'ok'
   end
 
-  it "does not meter where the middleware is inserted" do
+  it "does not matter where the middleware is inserted" do
     mock_app {
       use Rack::Policy::CookieLimiter
       use Rack::Session::Cookie, :key => 'app.session', :path => '/', :secret => 'foo'
