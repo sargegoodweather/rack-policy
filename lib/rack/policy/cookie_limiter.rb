@@ -31,7 +31,7 @@ module Rack
       end
 
       def white_list
-        @white_list ||= options[:white_list] || WHITE_LIST
+        @white_list ||= (options[:white_list] || WHITE_LIST) + [consent_token]
       end
 
       def expires
