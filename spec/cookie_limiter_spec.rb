@@ -21,24 +21,58 @@ describe Rack::Policy::CookieLimiter do
   end
 
   context 'no consent' do
-    it 'removes cookie session header' do
-      mock_app {
-        use Rack::Policy::CookieLimiter
-        run DummyApp
-      }
-      request '/'
-      last_response.should be_ok
-      last_response.headers['Set-Cookie'].should be_nil
+    context 'no whitelist' do
+      it 'removes cookie session header' do
+        mock_app {
+          use Rack::Policy::CookieLimiter
+          run DummyApp
+        }
+        request '/'
+        last_response.should be_ok
+        last_response.headers['Set-Cookie'].should be_nil
+      end
+
+      it 'clears all the cookies' do
+        mock_app {
+          use Rack::Policy::CookieLimiter, :consent_token => 'consent'
+          run DummyApp
+        }
+        set_cookie ["foo=1", "bar=2"]
+        request '/'
+        last_request.cookies.should == {}
+      end
     end
 
-    it 'clears all the cookies' do
-      mock_app {
-        use Rack::Policy::CookieLimiter, :consent_token => 'consent'
-        run DummyApp
-      }
-      set_cookie ["foo=1", "bar=2"]
-      request '/'
-      last_request.cookies.should == {}
+    context 'whitelist' do
+      it 'does not clear whitelisted cookies' do
+        mock_app {
+          use Rack::Policy::CookieLimiter, :consent_token => 'consent', :white_list => ["bar"]
+          run DummyApp
+        }
+        set_cookie ["foo=1", "bar=2"]
+        request '/'
+        last_request.cookies.should == {'bar' => '2'}
+      end
+
+      it 'remove cookie session header' do
+        mock_app {
+          use Rack::Policy::CookieLimiter, :white_list => ["bar"]
+          run DummyApp
+        }
+        request '/'
+        last_response.should be_ok
+        last_response.headers['Set-Cookie'].should be_nil
+      end
+
+      it 'clears all the cookies' do
+        mock_app {
+          use Rack::Policy::CookieLimiter, :consent_token => 'consent', :white_list => ["bar"]
+          run DummyApp
+        }
+        set_cookie ["foo=1", "stuff=2"]
+        request '/'
+        last_request.cookies.should == {}
+      end
     end
 
     it 'revalidates caches' do
