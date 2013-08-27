@@ -29,21 +29,60 @@ describe Rack::Policy::Helpers do
     helper_test.cookies_accepted?.should be_false
   end
 
-  it "doesn't accept cookies" do
-    helper_test.request.env.stub(:[]).with('rack-policy.consent') { nil }
-    helper_test.cookies_accepted?.should be_false
+  context "unset" do
+    before do
+      helper_test.request.env.stub(:[]).with('rack-policy.consent') { :unset }
+    end
+
+    it "doesn't accept cookies" do
+      helper_test.cookies_accepted?.should be_false
+    end
+
+    it "reject cookies" do
+      helper_test.cookies_rejected?.should be_false
+    end
   end
 
-  it "accepts cookies" do
-    helper_test.request.env.stub(:[]).with('rack-policy.consent') { 'true' }
-    helper_test.cookies_accepted?.should be_true
+  context "accepted" do
+    before do
+      helper_test.request.env.stub(:[]).with('rack-policy.consent') { :accepted }
+    end
+
+    it "doesn't accept cookies" do
+      helper_test.cookies_accepted?.should be_true
+    end
+
+    it "reject cookies" do
+      helper_test.cookies_rejected?.should be_false
+    end
+
+    it "yields to the block" do
+      helper_test.request.env.stub(:[]).with('rack-policy.consent') { :accepted }
+      block = Proc.new { 'Accepted'}
+      helper_test.should_receive(:cookies_accepted?).and_yield(&block)
+      helper_test.cookies_accepted?(&block)
+    end
   end
 
-  it "yields to the block" do
-    helper_test.request.env.stub(:[]).with('rack-policy.consent') { 'true' }
-    block = Proc.new { 'Accepted'}
-    helper_test.should_receive(:cookies_accepted?).and_yield(&block)
-    helper_test.cookies_accepted?(&block)
+  context "rejected" do
+    before do
+      helper_test.request.env.stub(:[]).with('rack-policy.consent') { :rejected }
+    end
+
+    it "doesn't accept cookies" do
+      helper_test.cookies_accepted?.should be_false
+    end
+
+    it "reject cookies" do
+      helper_test.cookies_rejected?.should be_true
+    end
+
+    it "yields to the block" do
+      helper_test.request.env.stub(:[]).with('rack-policy.consent') { :rejected }
+      block = Proc.new { 'Rejected'}
+      helper_test.should_receive(:cookies_rejected?).and_yield(&block)
+      helper_test.cookies_rejected?(&block)
+    end
   end
 
 end # Rack::Policy::Helpers

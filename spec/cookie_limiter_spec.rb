@@ -20,7 +20,7 @@ describe Rack::Policy::CookieLimiter do
     last_response.headers['Set-Cookie'].should be_nil
   end
 
-  context 'no consent' do
+  context 'unset' do
     context 'no whitelist' do
       it 'removes cookie session header' do
         mock_app {
@@ -86,22 +86,55 @@ describe Rack::Policy::CookieLimiter do
     end
   end
 
-  context 'with consent' do
+  context 'rejected' do
     it 'preserves cookie header' do
-      mock_app with_headers('Set-Cookie' => "cookie_limiter=true; path=/;")
+      mock_app with_headers('Set-Cookie' => "cookie_limiter=rejected; path=/;")
       get '/'
       last_response.should be_ok
       last_response.headers['Set-Cookie'].should_not be_nil
     end
 
     it 'sets consent cookie' do
-      mock_app with_headers('Set-Cookie' => "cookie_limiter=true; path=/;")
+      mock_app with_headers('Set-Cookie' => "cookie_limiter=rejected; path=/;")
+      get '/'
+      last_response.headers['Set-Cookie'].should =~ /cookie_limiter/
+    end
+
+    it 'clears other cookies' do
+      mock_app with_headers('Set-Cookie' => "cookie_limiter=rejected; path=/;\ngithub.com=bot")
+      get '/'
+      last_response.headers['Set-Cookie'].should_not =~ /github.com=bot/
+    end
+
+   #  context 'token' do
+   #    it 'preserves all the cookies if custom consent token present' do
+   #      mock_app {
+   #        use Rack::Policy::CookieLimiter, :consent_token => 'consent'
+   #        run DummyApp
+   #      }
+   #      set_cookie ["foo=1", "bar=2", "consent=rejected"]
+   #      request '/'
+   #      last_request.cookies.should == {'consent'=>'rejected'}
+   #    end
+   #  end
+  end
+
+  context 'accepted' do
+    it 'preserves cookie header' do
+      mock_app with_headers('Set-Cookie' => "cookie_limiter=accepted; path=/;")
+      get '/'
+      last_response.should be_ok
+      last_response.headers['Set-Cookie'].should_not be_nil
+    end
+
+    it 'sets consent cookie' do
+      mock_app with_headers('Set-Cookie' => "cookie_limiter=accepted; path=/;")
       get '/'
       last_response.headers['Set-Cookie'].should =~ /cookie_limiter/
     end
 
     it 'preserves other session cookies' do
-      mock_app with_headers('Set-Cookie' => "cookie_limiter=true; path=/;\ngithub.com=bot")
+      mock_app with_headers('Set-Cookie' => "cookie_limiter=accepted; path=/;\ngithub.com=bot")
       get '/'
       last_response.headers['Set-Cookie'].should =~ /github.com=bot/
     end
@@ -112,14 +145,14 @@ describe Rack::Policy::CookieLimiter do
           use Rack::Policy::CookieLimiter, :consent_token => 'consent'
           run DummyApp
         }
-        set_cookie ["foo=1", "bar=2", "consent=true"]
+        set_cookie ["foo=1", "bar=2", "consent=accepted"]
         request '/'
-        last_request.cookies.should == {'foo'=>'1', 'bar'=>'2', 'consent'=>'true'}
+        last_request.cookies.should == {'foo'=>'1', 'bar'=>'2', 'consent'=>'accepted'}
       end
     end
   end
 
-  context 'accepts?' do
+  context 'set_policy' do
     it "sets environment consent variable" do
        mock_app {
         use Rack::Policy::CookieLimiter
@@ -129,14 +162,33 @@ describe Rack::Policy::CookieLimiter do
       last_request.env.should have_key('rack-policy.consent')
     end
 
-    it "assigns value for the consent variable" do
+    it "assigns accepted for the consent variable" do
        mock_app {
         use Rack::Policy::CookieLimiter, :consent_token => 'consent'
         run DummyApp
       }
-      set_cookie ["consent=true"]
+      set_cookie ["consent=accepted"]
       request '/'
-      last_request.env['rack-policy.consent'].should == 'true'
+      last_request.env['rack-policy.consent'].should == :accepted
+    end
+
+    it "assigns rejected for the consent variable" do
+       mock_app {
+        use Rack::Policy::CookieLimiter, :consent_token => 'consent'
+        run DummyApp
+      }
+      set_cookie ["consent=rejected"]
+      request '/'
+      last_request.env['rack-policy.consent'].should == :rejected
+    end
+
+    it "assigns unset for the consent variable" do
+       mock_app {
+        use Rack::Policy::CookieLimiter, :consent_token => 'consent'
+        run DummyApp
+      }
+      request '/'
+      last_request.env['rack-policy.consent'].should == :unset
     end
   end
 

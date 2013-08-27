@@ -45,7 +45,7 @@ module Rack
       def call!(env)
         @env = env
         request = Rack::Request.new(env)
-        accepts?(request)
+        set_policy identify_policy request.cookies
         @status, @headers, @body = @app.call(env)
         response = Rack::Response.new body, status, headers
         clear_cookies!(request, response) unless allowed?(request)
@@ -54,27 +54,16 @@ module Rack
 
       # Identifies the approval of cookie policy inside rack app.
       #
-      def accepts?(request)
-        if ( request.cookies.has_key?(consent_token.to_s) )
-          @env['rack-policy.consent'] = 'true'
-        else
-          if (cookie_string = @env[HTTP_COOKIE])
-            @env[HTTP_COOKIE] = filtered_cookie_string cookie_string
-          end
-          @env['rack-policy.consent'] = nil
-        end
+      def identify_policy(cookies)
+        return :unset unless cookies.has_key? key = consent_token.to_s
+        /accepted/i =~ cookies[key] ? :accepted : :rejected
       end
 
       # Returns `false` if the cookie policy disallows cookie storage
       # for a given request, or `true` otherwise.
       #
       def allowed?(request)
-        if ( request.cookies.has_key?(consent_token.to_s) ||
-             parse_cookies(headers[SET_COOKIE]).has_key?(consent_token.to_s) )
-          true
-        else
-          false
-        end
+        identify_policy(request.cookies) == :accepted || identify_policy(parse_cookies(headers[SET_COOKIE])) == :accepted
       end
 
       # Finish http response with proper headers
@@ -117,13 +106,20 @@ module Rack
         end.join ";"
       end
 
+      def set_policy policy
+        @env['rack-policy.consent'] = policy
+        if (policy == :unset || policy == :rejected) && (cookie_string = @env[HTTP_COOKIE])
+          @env[HTTP_COOKIE] = filtered_cookie_string cookie_string
+        end
+      end
+
       def clear_cookies!(request, response)
         cookies = parse_cookies headers[SET_COOKIE]
         headers[SET_COOKIE] = filtered_cookie_string headers[SET_COOKIE]
         revalidate_cache!
 
         cookies.merge(request.cookies).each do |key, value|
-          response.delete_cookie key.to_sym unless white_list.include? key.to_s
+          response.delete_cookie key.to_sym unless true
         end
 
         headers
