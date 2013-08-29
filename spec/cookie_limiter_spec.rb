@@ -106,17 +106,17 @@ describe Rack::Policy::CookieLimiter do
       last_response.headers['Set-Cookie'].should_not =~ /github.com=bot/
     end
 
-   #  context 'token' do
-   #    it 'preserves all the cookies if custom consent token present' do
-   #      mock_app {
-   #        use Rack::Policy::CookieLimiter, :consent_token => 'consent'
-   #        run DummyApp
-   #      }
-   #      set_cookie ["foo=1", "bar=2", "consent=rejected"]
-   #      request '/'
-   #      last_request.cookies.should == {'consent'=>'rejected'}
-   #    end
-   #  end
+    context 'token' do
+      it 'preserves all the cookies if custom consent token present' do
+        mock_app {
+          use Rack::Policy::CookieLimiter, :consent_token => 'consent'
+          run DummyApp
+        }
+        set_cookie ["foo=1", "bar=2", "consent=rejected"]
+        request '/'
+        last_request.cookies.should == {'consent'=>'rejected'}
+      end
+    end
   end
 
   context 'accepted' do

@@ -56,7 +56,7 @@ module Rack
       #
       def identify_policy(cookies)
         return :unset unless cookies.has_key? key = consent_token.to_s
-        /accepted/i =~ cookies[key] ? :accepted : :rejected
+        /accepted/i =~ cookie_value(cookies[key]) ? :accepted : :rejected
       end
 
       # Returns `false` if the cookie policy disallows cookie storage
@@ -89,40 +89,46 @@ module Rack
         if cookie_string
           cookie_string = cookie_string.split("\n") if cookie_string.respond_to?(:to_str)
           cookie_string.each do |cookie|
-            if pair = cookie.split(';').first
-              key, value = pair.split('=').map { |v| ::Rack::Utils.unescape(v) }
-              cookies[key] = value
-            end
+            key, value = cookie.split('=').map { |v| ::Rack::Utils.unescape(v) }
+            cookies[key] = value
           end
         end
         cookies
       end
 
-      def filtered_cookie_string cookie_string
-        parse_cookies(cookie_string).select do |key, _|
-          white_list.include? key
+      def cookie_value cookie
+        cookie.split(";").first
+      end
+
+      def filtered_cookie_string cookies
+        cookies.select do |key, _|
+          white_listed_cookie? key
         end.map do |key, value|
           "#{key}=#{value}"
-        end.join ";"
+        end.join "\n"
       end
 
       def set_policy policy
         @env['rack-policy.consent'] = policy
         if (policy == :unset || policy == :rejected) && (cookie_string = @env[HTTP_COOKIE])
-          @env[HTTP_COOKIE] = filtered_cookie_string cookie_string
+          @env[HTTP_COOKIE] = filtered_cookie_string parse_cookies cookie_string
         end
       end
 
       def clear_cookies!(request, response)
         cookies = parse_cookies headers[SET_COOKIE]
-        headers[SET_COOKIE] = filtered_cookie_string headers[SET_COOKIE]
+        headers[SET_COOKIE] = filtered_cookie_string cookies
         revalidate_cache!
 
         cookies.merge(request.cookies).each do |key, value|
-          response.delete_cookie key.to_sym unless true
+          response.delete_cookie key.to_sym unless white_listed_cookie? key
         end
 
         headers
+      end
+
+      def white_listed_cookie? cookie
+        white_list.include? cookie.to_s
       end
 
       def revalidate_cache!

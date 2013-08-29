@@ -12,7 +12,7 @@ require 'rack/policy'
 module DummyApp
   def self.call(env)
     Thread.current[:last_env] = env
-    [200, {'Content-Type' => 'text/plain'}, ['ok']]
+    [200, {'Content-Type' => 'text/plain', 'Set-Cookie' => 'bar=nastycookie'}, ['ok']]
   end
 end
 
