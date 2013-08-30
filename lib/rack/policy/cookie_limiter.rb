@@ -46,6 +46,7 @@ module Rack
         @env = env
         request = Rack::Request.new(env)
         set_policy identify_policy request.cookies
+        set_request_cookie_string
         @status, @headers, @body = @app.call(env)
         response = Rack::Response.new body, status, headers
         clear_cookies!(request, response) unless allowed?(request)
@@ -89,7 +90,7 @@ module Rack
         if cookie_string
           cookie_string = cookie_string.split("\n") if cookie_string.respond_to?(:to_str)
           cookie_string.each do |cookie|
-            key, value = cookie.split('=').map { |v| ::Rack::Utils.unescape(v) }
+            key, value = cookie.split('=', 2)
             cookies[key] = value
           end
         end
@@ -100,24 +101,37 @@ module Rack
         cookie.split(";").first
       end
 
-      def filtered_cookie_string cookies
+      def filter_cookies cookies
         cookies.select do |key, _|
           white_listed_cookie? key
-        end.map do |key, value|
+        end
+      end
+
+      def to_set_cookie_string cookies
+        cookies.map do |key, value|
           "#{key}=#{value}"
         end.join "\n"
       end
 
+      def to_cookie_string cookies
+        cookies.map do |key, value|
+          "#{key}=#{value}"
+        end.join ";"
+      end
+
       def set_policy policy
         @env['rack-policy.consent'] = policy
-        if (policy == :unset || policy == :rejected) && (cookie_string = @env[HTTP_COOKIE])
-          @env[HTTP_COOKIE] = filtered_cookie_string parse_cookies cookie_string
+      end
+
+      def set_request_cookie_string
+        if (@env['rack-policy.consent'] == :unset || @env['rack-policy.consent'] == :rejected) && (cookie_string = @env[HTTP_COOKIE])
+          @env[HTTP_COOKIE] = to_cookie_string filter_cookies parse_cookies cookie_string
         end
       end
 
       def clear_cookies!(request, response)
         cookies = parse_cookies headers[SET_COOKIE]
-        headers[SET_COOKIE] = filtered_cookie_string cookies
+        headers[SET_COOKIE] = to_set_cookie_string filter_cookies cookies
         revalidate_cache!
 
         cookies.merge(request.cookies).each do |key, value|

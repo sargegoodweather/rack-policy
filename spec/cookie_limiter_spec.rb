@@ -217,5 +217,4 @@ describe Rack::Policy::CookieLimiter do
       last_response.body.should be_empty
     end
   end
-
 end # Rack::Policy::CookieLimiter
