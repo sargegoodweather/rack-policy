@@ -106,7 +106,7 @@ module Rack
           white_listed_cookie? key
         end
 
-        $stderr.puts "RACK-POLICY WARNING: #{rejected_cookies} WERE SET" unless rejected_cookies.empty?
+        $stderr.puts "RACK-POLICY WARNING: COOKIES #{rejected_cookies.to_json} WERE SET" unless rejected_cookies.empty?
 
         white_listed_cookies
       end
