@@ -102,9 +102,13 @@ module Rack
       end
 
       def filter_cookies cookies
-        cookies.select do |key, _|
+        white_listed_cookies, rejected_cookies = cookies.partition do |key, _|
           white_listed_cookie? key
         end
+
+        $stderr.puts "RACK-POLICY WARNING: #{rejected_cookies} WERE SET" unless rejected_cookies.empty?
+
+        white_listed_cookies
       end
 
       def to_set_cookie_string cookies
